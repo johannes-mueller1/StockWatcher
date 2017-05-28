@@ -1,6 +1,8 @@
 package com.google.gwt.sample.stockwatcher.shared.bo;
 
-public class StockPrice {
+import java.io.Serializable;
+
+public class StockPrice implements Serializable {
 	 private String symbol;
 	  private double price;
 	  private double change;

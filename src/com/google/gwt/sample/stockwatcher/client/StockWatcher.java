@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 
 import com.google.gwt.core.client.EntryPoint;
+import com.google.gwt.core.shared.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.dom.client.KeyCodes;
@@ -11,10 +12,13 @@ import com.google.gwt.event.dom.client.KeyDownEvent;
 import com.google.gwt.event.dom.client.KeyDownHandler;
 import com.google.gwt.i18n.client.DateTimeFormat;
 import com.google.gwt.i18n.client.NumberFormat;
+import com.google.gwt.sample.stockwatcher.shared.StockPriceService;
+import com.google.gwt.sample.stockwatcher.shared.StockPriceServiceAsync;
 import com.google.gwt.sample.stockwatcher.shared.bo.StockPrice;
 import com.google.gwt.user.client.Random;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.Window;
+import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.FlexTable;
 import com.google.gwt.user.client.ui.HorizontalPanel;
@@ -33,6 +37,7 @@ public class StockWatcher implements EntryPoint {
   private Label lastUpdatedLabel = new Label();
   private ArrayList<String> stocks = new ArrayList<String>();
   private static final int REFRESH_INTERVAL = 5000; // ms
+  private StockPriceServiceAsync stockPriceSvc = GWT.create(StockPriceService.class);
 
   /**
    * Entry point method.
@@ -43,10 +48,18 @@ public class StockWatcher implements EntryPoint {
 	    stocksFlexTable.setText(0, 1, "Price");
 	    stocksFlexTable.setText(0, 2, "Change");
 	    stocksFlexTable.setText(0, 3, "Remove");
+	    
+	    // Add styles to elements in the stock list table.
+	    stocksFlexTable.getRowFormatter().addStyleName(0, "watchListHeader");
+	    stocksFlexTable.addStyleName("watchList");
+	    stocksFlexTable.getCellFormatter().addStyleName(0, 1, "watchListNumericColumn");
+	    stocksFlexTable.getCellFormatter().addStyleName(0, 2, "watchListNumericColumn");
+	    stocksFlexTable.getCellFormatter().addStyleName(0, 3, "watchListRemoveColumn");
 
     // TODO Assemble Add Stock panel.
 	    addPanel.add(newSymbolTextBox);
 	    addPanel.add(addStockButton);
+	    addPanel.addStyleName("addPanel");
 	    
 	    
     // TODO Assemble Main panel.
@@ -119,6 +132,9 @@ public class StockWatcher implements EntryPoint {
       int row = stocksFlexTable.getRowCount();
       stocks.add(symbol);
       stocksFlexTable.setText(row, 0, symbol);
+      stocksFlexTable.getCellFormatter().addStyleName(row, 1, "watchListNumericColumn");
+      stocksFlexTable.getCellFormatter().addStyleName(row, 2, "watchListNumericColumn");
+      stocksFlexTable.getCellFormatter().addStyleName(row, 3, "watchListRemoveColumn");
       
       // TODO Add a button to remove this stock from the table.
       Button removeStockButton = new Button("x");
@@ -137,20 +153,24 @@ public class StockWatcher implements EntryPoint {
   }  
   
   private void refreshWatchList() {
-	  final double MAX_PRICE = 100.0; // $100.00
-	     final double MAX_PRICE_CHANGE = 0.02; // +/- 2%
+	  // Initialize the service proxy.
+	    if (stockPriceSvc == null) {
+	      stockPriceSvc = GWT.create(StockPriceService.class);
+	    }
 
-	     StockPrice[] prices = new StockPrice[stocks.size()];
-	     for (int i = 0; i < stocks.size(); i++) {
-	       double price = Random.nextDouble() * MAX_PRICE;
-	       double change = price * MAX_PRICE_CHANGE
-	           * (Random.nextDouble() * 2.0 - 1.0);
+	     // Set up the callback object.
+	    AsyncCallback<StockPrice[]> callback = new AsyncCallback<StockPrice[]>() {
+	      public void onFailure(Throwable caught) {
+	        // TODO: Do something with errors.
+	      }
 
-	       prices[i] = new StockPrice(stocks.get(i), price, change);
-	     }
+	      public void onSuccess(StockPrice[] result) {
+	        updateTable(result);
+	      }
+	    };
 
-	     updateTable(prices);
-		
+	     // Make the call to the stock price service.
+	    stockPriceSvc.getPrices(stocks.toArray(new String[0]), callback);
 	}
   
   /**
